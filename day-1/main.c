@@ -30,9 +30,9 @@ int main(int argc, char **argv) {
 
   // TASK 2:
   int j = 0; // This is simplified by the fact that the lists are sorted
-  int previous;
-  int occurences;
-  int sum_t2; 
+  int previous = -1;
+  int occurences = 0;
+  int sum_t2 = 0; 
   for (int i = 0; i < arrays.length_x; i++) {
     // if current == previous just use the last result
     if (i && arrays.x[i] == previous) {
@@ -61,5 +61,7 @@ int main(int argc, char **argv) {
 
   printf("ANSWER TASK 2\n  The sum is %d\n", sum_t2);
 
+  freeArrays(arrays); // dont forget!
+  
   return 0;
 }

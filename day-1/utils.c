@@ -15,9 +15,9 @@ void printSubIntArr(const int *x, const int start, const int end) {
 }
 
 
-int comp(const void *x, const void *y) {
-  return *(int *)x - *(int *)y; // cast to int pointer, then cast to int
-}
+// int comp(const void *x, const void *y) {
+//   return *(int *)x - *(int *)y; // cast to int pointer, then cast to int
+// }
 
 
 int abs(int x) {

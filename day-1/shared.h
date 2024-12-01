@@ -20,7 +20,7 @@ typedef struct {
 } TwoArrays;
 
 TwoArrays readFileAllocateArrays(const char *path);
-void deleteArrays(TwoArrays arrays);
+void freeArrays(TwoArrays arrays);
 
 
 #endif // !shared_lib 

@@ -48,6 +48,8 @@ TwoArrays readFileAllocateArrays(const char *path) {
     }
   }
 
+  fclose(fileptr); // dont forget!
+  
   arrays.x = x; arrays.y = y;
   arrays.length_x = pos_x;
   arrays.length_y = pos_y;
@@ -56,7 +58,7 @@ TwoArrays readFileAllocateArrays(const char *path) {
 }
 
 
-void deleteArrays(TwoArrays arrays) {
+void freeArrays(TwoArrays arrays) {
   free(arrays.x);
   free(arrays.y);
 }
