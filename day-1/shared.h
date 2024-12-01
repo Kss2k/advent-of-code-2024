@@ -2,19 +2,22 @@
 
 #define shared_lib
 
-// utils
+
+// utils.c ---------------------------------------------------------------------
 void printIntArr(const int *x, const int size);
 void printSubIntArr(const int *x, const int start, const int end);
+// int comp(const void *x, const void *y); // comparison for qsort()
+int abs(int x);
+void quicksort(int *x, const int n);
 
 
-// read file/array
+// readfile.c ------------------------------------------------------------------
 typedef struct {
   int *x;
   int *y;
   int length_x;
   int length_y;
 } TwoArrays;
-
 
 TwoArrays readFileAllocateArrays(const char *path);
 void deleteArrays(TwoArrays arrays);
