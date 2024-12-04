@@ -1,6 +1,5 @@
 #include <ctype.h>
 #include <stdio.h>
-#include <regex.h>
 
 
 int parseMul(FILE *file) {
