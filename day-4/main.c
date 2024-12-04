@@ -18,7 +18,7 @@ Array readFile(const char *path) {
   }
 
   fseek(file, 0L, SEEK_END); 
-  long int size = ftell(file);
+  long int size = ftell(file) + sizeof(char); // +1 for '\0'
 
   char *X = (char*)malloc(size);
   fseek(file, 0L, SEEK_SET);
@@ -59,6 +59,13 @@ int getWidth(const char *x) {
   int i;
   for (i = 0; x[i] != '\0' && x[i] != '\n' && i < MAX_LOOP_GW; i++);
   return i + 1;
+}
+
+
+int isMASCross(char uleft, char uright, char lleft, char lright) {
+  int okayL2R = (uleft == 'M' && lright == 'S') || (uleft == 'S' && lright == 'M');
+  int okayR2L = (uright == 'M' && lleft == 'S') || (uright == 'S' && lleft == 'M');
+  return okayL2R && okayR2L;
 }
 
 
@@ -123,7 +130,6 @@ int main(int argv, char *argc[]) {
       char c = X[i * width + j];
       MEAT(sum_t1);
     }
-  
     HARD_RESET;
   }
  
@@ -133,7 +139,6 @@ int main(int argv, char *argc[]) {
       char c = X[i * width + j];
       MEAT(sum_t1);
     }
-  
     HARD_RESET;
   }
 
@@ -141,12 +146,10 @@ int main(int argv, char *argc[]) {
   for (int i = 0; i < length; i++) {
     int searchWidth = !i ? width : 1;
     for (int j = 0; j < searchWidth; j++) {
-      
       for (int k = 0; k + j < width && k + i < length; k++) {
         char c = X[(i + k) * width + j + k];
         MEAT(sum_t1);
       }
-
       HARD_RESET;
     }
   }
@@ -155,16 +158,37 @@ int main(int argv, char *argc[]) {
   for (int i = 0; i < length; i++) {
     int searchWidth = !i ? width : 1;
     for (int j = width - 2; j >= width - searchWidth - 1 && j > 0; j--) {
-  
       for (int k = 0; j - k >= 0 && k + i < length; k++) {
         char c = X[(i + k) * width + j - k];
         MEAT(sum_t1);
       }
-
       HARD_RESET;
     }
   }
+
   printf("Answer Task 1:\n  Sum = %d\n", sum_t1);
+
+  // Task 2
+  int sum_t2 = 0;
+  char c;
+  for (int i = 1; i < length - 1; i++) {
+    for (int j = 1; j < width - 1; j++) {
+      if ((c = X[i * width + j]) != 'A') continue;
+      
+      int upper = (i - 1) * width, 
+          lower = (i + 1) * width, 
+          left  = j - 1, 
+          right = j + 1;
+
+      char uright = X[upper + right], 
+           uleft  = X[upper + left],
+           lright = X[lower + right], 
+           lleft  = X[lower + left];
+
+      if (isMASCross(uleft, uright, lleft, lright)) sum_t2++;
+    }
+  }
+  printf("Answer Task 2:\n  Sum = %d\n", sum_t2);
 
   free(X);
 
