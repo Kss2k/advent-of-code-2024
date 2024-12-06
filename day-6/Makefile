@@ -1,2 +1,2 @@
-main: main.c
-	gcc -o main.o main.c
+main: main.c array.c shared.h
+	gcc -o main.o main.c array.c

@@ -1,8 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "shared.h"
 
-#define MAX_LOOP 50000
+#define MAX_LOOP 100000
 
 typedef struct {
   char **x;
@@ -221,34 +219,49 @@ int iterMap(Map *M, int trail) {
 }
 
 
-void findGuard(int *i, int *j, Map *M) {
+int findGuard(int *i, int *j, Map *M) {
   for (*i = 0; *i < M->nrow; (*i)++) {
     for (*j = 0; *j < M->ncol; (*j)++) {
-      if (isGuard(M->x[*i][*j])) return;
+      if (isGuard(M->x[*i][*j])) return 1;
     }
   }
   printf("Could not find guard!\n");
-  return;
+  return 0;
 }
 
 
 int checkIfLoop(Map *M) {
-  Map *N = copyMap(M);
+  Map *N1 = copyMap(M); // UGLY AS F**K
+  Map *N2 = copyMap(M); // UGLY AS F**K
+  Map *N3 = copyMap(M); // UGLY AS F**K
 
   int g_i, g_j, loop = 0;
   for (int i = 0; i < MAX_LOOP && iterMap(M, 0); i++) {
-    printf("Iteration %d\r", i);
+    printf("  sub-iters: %d\r", i);
 
-    findGuard(&g_i, &g_j, M);
-    if (N->x[g_i][g_j] == M->x[g_i][g_j]) {
+    if(!findGuard(&g_i, &g_j, M)) break;
+    if (N1->x[g_i][g_j] == M->x[g_i][g_j] || 
+        N2->x[g_i][g_j] == M->x[g_i][g_j] ||
+        N3->x[g_i][g_j] == M->x[g_i][g_j]) {
       loop = 1;
       break;
-    } else N->x[g_i][g_j] = M->x[g_i][g_j];
+    } else {
+      N3->x[g_i][g_j] = N2->x[g_i][g_j];
+      N2->x[g_i][g_j] = N1->x[g_i][g_j];
+      N1->x[g_i][g_j] = M->x[g_i][g_j];
+    }
 
-    if (i + 1 == MAX_LOOP) printf("\nWARNING: REACED MAX!\n");
+    if (i + 1 == MAX_LOOP) {
+      printf("\nWARNING: REACHED MAX!\n");
+      loop = 1;
+    }
   }
 
-  freeMap(N);
+  printf("\n");
+
+  freeMap(N1);
+  freeMap(N2);
+  freeMap(N3);
 
   return loop;
 }
@@ -265,16 +278,15 @@ int main(int argv, char **argc) {
 
   int i; 
   for (i = 0; i < MAX_LOOP; i++) {
-    // printf("Iteration %d\n", i);
     int status = iterMap(M, 1);
-    // printMap(M);
     if (!status) break;
   }
 
+  int sum_t1 = countX(M);
   if (i == MAX_LOOP) {
     printf("Max loop reached!\n");
   } else {
-    printf("Answer task 1:\n  Sum = %d\n", countX(M));
+    printf("Answer task 1:\n  Sum = %d\n", sum_t1);
   }
 
   Map *O;
@@ -284,19 +296,75 @@ int main(int argv, char **argc) {
   int sum_t2 = 0;
   for (i = 0; i < N->nrow; i++) {
     for (int j = 0; j < N->ncol; j++) {
-      // if (N->x[i][j] == '#' || isGuard(N->x[i][j])) continue;
       if (M->x[i][j] != 'X') continue;
 
       Map *O = copyMap(N);
       O->x[i][j] = '#';
       printf("Checking if hinderance at %d,%d\n", i, j);
-      // printMap(N);
       int isLoop = checkIfLoop(O);
       if (isLoop) sum_t2++;
 
       freeMap(O);
     }
   }
+  // Array xs     = initArray(M->nrow * M->ncol);
+  // Array ys     = initArray(M->nrow * M->ncol);
+
+  // int sum_t2 = 0, g_j, g_i, x, y;
+  // for (i = 0; i < MAX_LOOP; i++) {
+  //   if (!iterMap(N, 0)) {
+  //     printf("Iter stopped!\n");
+  //     break;
+  //   }
+  //   int found = findGuard(&g_i, &g_j, N);
+  //   if (!found) break;
+  //   printf("Iteration %d\n", i+1);
+  //   Map *O = copyMap(N);
+  //   
+  //   switch (N->x[g_i][g_j]) {
+  //     case '^': {
+  //       if (g_i <= 0) break;
+  //       x = g_i - 1;
+  //       y = g_j;
+  //       break;
+  //     }
+  //     case '<': {
+  //       if (g_j <= 0) break;
+  //       x = g_i;
+  //       y = g_j - 1;
+  //       break;
+  //     }
+  //     case '>': {
+  //       if (g_j + 1 >= M->ncol) break;
+  //       x = g_i;
+  //       y = g_j + 1;
+  //       break;
+  //     }
+  //     case 'v': {
+  //       if (g_i + 1 >= M->nrow) break;
+  //       x = g_i + 1;
+  //       y = g_j;
+  //       break;
+  //     }
+  //   }
+
+  //   if (isin(x, y, xs, ys)) {
+  //     printf("Found loop at %d, %d\n", x, y);
+  //     sum_t2++;
+  //     continue;
+  //   }
+
+  //   O->x[y][x] = '#';
+
+  //   int isLoop = checkIfLoop(O);
+  //   if (isLoop) {
+  //     sum_t2++;
+  //     append(&xs, x);
+  //     append(&ys, y);
+  //   }
+ 
+  //   freeMap(O);
+  // }
 
   printf("Answer Task 2:\n  Sum = %d\n", sum_t2);
 
