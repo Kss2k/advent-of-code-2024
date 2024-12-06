@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#define MAX_LOOP 10000
+#define MAX_LOOP 50000
 
 typedef struct {
   char **x;
@@ -24,6 +25,16 @@ Map *initMap(int nrow, int ncol) {
 }
 
 
+Map *copyMap(Map *M) {
+  Map *N = initMap(M->nrow, M->ncol);
+  for (int i = 0; i < M->nrow; i++) {
+    memcpy(N->x[i], M->x[i], M->ncol * sizeof(M->x[i][0]));
+  }
+
+  return N;
+}
+
+
 void freeMap(Map *M) {
   for (int i = 0; i < M->nrow; i++) {
     free(M->x[i]);
@@ -33,9 +44,15 @@ void freeMap(Map *M) {
 }
 
 
+int isOk(char c) {
+  return c == '.' || c == 'X' || c == 'v' || c == '^' || c == '<' || c == '>' || c == '#';
+}
+
+
 void printMap(Map *M) {
   for (int i = 0; i < M->nrow; i++) {
     for (int j = 0; j < M->ncol; j++) {
+      if (!isOk(M->x[i][j])) printf("\nFOUND character (%d) where it should not be!\n", M->x[i][j]);
       printf("%c", M->x[i][j]);
     }
     printf("\n");
@@ -54,7 +71,7 @@ Map *readfile(const char *path) {
   fseek(file, 0L, SEEK_SET);
   char c;
   int ncol;
-  for (ncol = 1; (c = getc(file)) != '\n'; ncol++);
+  for (ncol = 0; (c = getc(file)) != '\n'; ncol++);
 
   fseek(file, 0L, SEEK_SET);
   int nrow = 0;
@@ -135,36 +152,37 @@ void rotateGuard(int i, int j, Map *M) {
 }
 
 
-void moveGuard(int i, int j, Map *M) {
+int moveGuard(int i, int j, Map *M, int trail) {
   char c = M->x[i][j];
-  M->x[i][j] = 'X';
+  if (trail) M->x[i][j] = 'X';
+  else M->x[i][j] = '.';
 
   switch (c) {
     case '^': {
-      if (i <= 0) return;
+      if (i <= 0) return 0;
       M->x[i - 1][j] = '^';
-      return;
+      return 1;
     }
     case '<': {
-      if (j <= 0) return;
+      if (j <= 0) return 0;
       M->x[i][j - 1] = '<';
-      return;
+      return 1;
     }
     case '>': {
-      if (j + 1 >= M->ncol) return;
+      if (j + 1 >= M->ncol) return 0;
       M->x[i][j + 1] = '>';
-      return;
+      return 1;
     }
     case 'v': {
-      if (i + 1 >= M->nrow) return;
+      if (i + 1 >= M->nrow) return 0;
       M->x[i + 1][j] = 'v';
-      return;
+      return 1;
     }
   }
 
   printf("Tried to move something else than guard (%c)!\n", c);
   printMap(M);
-  return;
+  return -1;
 }
 
 
@@ -179,7 +197,7 @@ int countX(Map *M) {
 }
 
 
-int iterMap(Map *M) {
+int iterMap(Map *M, int trail) {
   int found = 0;
 
   for (int i = 0; i < M->nrow; i++) {
@@ -192,16 +210,47 @@ int iterMap(Map *M) {
         rotateGuard(i, j, M);
       } else {
         // printf("Guard is not hindered!\n");
-        moveGuard(i, j, M);
+        found = moveGuard(i, j, M, trail);
       }
 
-      return 1;
+      return found;
     }
   }
 
-  printf("Guard out of bounds!\n");
+  return found;
+}
 
-  return 0;
+
+void findGuard(int *i, int *j, Map *M) {
+  for (*i = 0; *i < M->nrow; (*i)++) {
+    for (*j = 0; *j < M->ncol; (*j)++) {
+      if (isGuard(M->x[*i][*j])) return;
+    }
+  }
+  printf("Could not find guard!\n");
+  return;
+}
+
+
+int checkIfLoop(Map *M) {
+  Map *N = copyMap(M);
+
+  int g_i, g_j, loop = 0;
+  for (int i = 0; i < MAX_LOOP && iterMap(M, 0); i++) {
+    printf("Iteration %d\r", i);
+
+    findGuard(&g_i, &g_j, M);
+    if (N->x[g_i][g_j] == M->x[g_i][g_j]) {
+      loop = 1;
+      break;
+    } else N->x[g_i][g_j] = M->x[g_i][g_j];
+
+    if (i + 1 == MAX_LOOP) printf("\nWARNING: REACED MAX!\n");
+  }
+
+  freeMap(N);
+
+  return loop;
 }
 
 
@@ -212,11 +261,12 @@ int main(int argv, char **argc) {
   }
 
   Map *M = readfile(argc[1]);
+  Map *N = copyMap(M);
 
   int i; 
   for (i = 0; i < MAX_LOOP; i++) {
     // printf("Iteration %d\n", i);
-    int status = iterMap(M);
+    int status = iterMap(M, 1);
     // printMap(M);
     if (!status) break;
   }
@@ -227,7 +277,31 @@ int main(int argv, char **argc) {
     printf("Answer task 1:\n  Sum = %d\n", countX(M));
   }
 
+  Map *O;
+  printMap(N);
+
+  // Task 2
+  int sum_t2 = 0;
+  for (i = 0; i < N->nrow; i++) {
+    for (int j = 0; j < N->ncol; j++) {
+      // if (N->x[i][j] == '#' || isGuard(N->x[i][j])) continue;
+      if (M->x[i][j] != 'X') continue;
+
+      Map *O = copyMap(N);
+      O->x[i][j] = '#';
+      printf("Checking if hinderance at %d,%d\n", i, j);
+      // printMap(N);
+      int isLoop = checkIfLoop(O);
+      if (isLoop) sum_t2++;
+
+      freeMap(O);
+    }
+  }
+
+  printf("Answer Task 2:\n  Sum = %d\n", sum_t2);
+
   freeMap(M);
+  freeMap(N);
 
   return 0;
 }
