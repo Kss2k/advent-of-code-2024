@@ -111,7 +111,7 @@ Computer readfile(const char *path) {
       continue;
     }
   }
-
+  fclose(file);
 
   return C;
 }
