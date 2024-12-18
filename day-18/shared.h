@@ -50,6 +50,7 @@ ARR_TYPE pop(Vector *X, const int i);
 
 // matrix.c
 Matrix initMatrix(const long int nrow, const long int ncol);
+Matrix copyMatrix(Matrix *M);
 void freeMatrix(Matrix *M);
 void printMatrix(Matrix *M);
 void fillMatrix(Matrix *M, MAT_TYPE fill);

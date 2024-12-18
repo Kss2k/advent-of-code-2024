@@ -16,6 +16,16 @@ Matrix initMatrix(const long int nrow, const long int ncol) {
 }
 
 
+Matrix copyMatrix(Matrix *M) {
+  Matrix N = initMatrix(M->nrow, M->ncol);
+  for (int i = 0; i < M->nrow; i++) {
+    memcpy(N.x[i], M->x[i], M->ncol * sizeof(MAT_TYPE));
+  }
+
+  return N;
+}
+
+
 void freeMatrix(Matrix *M) {
   for (int i = 0; i < M->nrow; i++) {
     free(M->x[i]);

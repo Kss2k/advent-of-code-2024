@@ -62,31 +62,28 @@ VectorPair readfile(const char *path) {
 
 int validPos(int i, int j, Matrix *M) {
   return i >= 0 && i < M->nrow && j >= 0 && j < M->ncol &&
-    M->x[i][j] != '#';
+    M->x[i][j] == '.';
 }
 
 
-int DjikstraStep3To5(Vector *Ui, Vector *Uj, Vector *Ai, Vector *Aj, Vector *D, Matrix *M) {
+int DjikstraStep3To5(Vector *Ai, Vector *Aj, Vector *D, Matrix *M) {
   // Step 3
-  int min_dist = -1, min_i = -1, min_j = -1;
-  
-  for (int k = 0; k < Ui->length; k++) {
-    int i = Ui->x[k], j = Uj->x[k];
-    int u = which2D(Ai, Aj, i, j);
+  int min_dist = -1, min_i = -1, min_j = -1, min_k;
 
-    if (D->x[u] < 0) continue;
+  for (int k = 0; k < Ai->length; k++) {
+    int i = Ai->x[k], j = Aj->x[k];
 
-    if (min_dist < 0 || (D->x[u] >= 0 && D->x[u] < min_dist)) {
-      min_dist = D->x[u], min_i = i, min_j = j;
-    }
+    if (M->x[i][j] != '.' || D->x[k] < 0) continue;
+
+    if (min_dist < 0 || D->x[k] < min_dist)
+      min_dist = D->x[k], min_i = i, min_j = j, min_k = k;
   }
 
   if (min_dist < 0) return 1;
+  M->x[min_i][min_j] = 'O';
 
   // Step 4
   int steps[3] = {-1, 0, 1};
-  Vector Ni = initVector(4);
-  Vector Nj = initVector(4);
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
@@ -97,42 +94,25 @@ int DjikstraStep3To5(Vector *Ui, Vector *Uj, Vector *Ai, Vector *Aj, Vector *D, 
       int n_i = min_i + steps[i], 
           n_j = min_j + steps[j];
 
-      if (!validPos(n_i, n_j, M) || which2D(Ui, Uj, n_i, n_j) == -1) 
+      if (!validPos(n_i, n_j, M)) 
         continue;
 
-      append(&Ni, n_i);
-      append(&Nj, n_j);
+      int u = which2D(Ai, Aj, n_i, n_j);
+      int d = D->x[u];
+
+      if (d < 0 || d > D->x[min_k] + 1)
+        D->x[u] = D->x[min_k] + 1;
     }
   }
-
-
-  for (int k = 0; k < Ni.length; k++) {
-    int i = Ni.x[k], j = Nj.x[k];
-
-    int u = which2D(Ai, Aj, i, j);
-    int c = which2D(Ai, Aj, min_i, min_j);
-    int d = D->x[u];
-
-    if (d < 0 || d > D->x[c] + 1)
-      D->x[u] = D->x[c] + 1;
-  }
-
-  // Step 5
-  int p = which2D(Ui, Uj, min_i, min_j);
-  pop(Ui, p);
-  pop(Uj, p);
-
-  freeVector(&Ni);
-  freeVector(&Nj);
 
   return 0;
 }
 
 
-void Djikstra(Vector *Ui, Vector *Uj, Vector *Ai, Vector *Aj, Vector *D, Matrix *M) {
+void Djikstra(Vector *Ai, Vector *Aj, Vector *D, Matrix *M) {
   int status = 0;
-  while (Ui->length > 0 && Uj->length > 0 && !status) 
-    status = DjikstraStep3To5(Ui, Uj, Ai, Aj, D, M);
+  for (int i = 0; i < Ai->length && !status; i++)
+    status = DjikstraStep3To5(Ai, Aj, D, M);
 }
 
 
@@ -142,37 +122,28 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
-  #define DIM 71
-  #define NANO_SECONDS 1024
-
-
+  int nano_sec = 12;
+  int dim = 7;
+  int target_i = dim - 1, target_j = dim - 1;
   VectorPair V = readfile(argv[1]);
 
-  Matrix M = initMatrix(DIM, DIM);
+  Matrix M = initMatrix(dim, dim);
   fillMatrix(&M, '.');
 
-  for (int k = 0; k < NANO_SECONDS && k < V.X.length && k < V.Y.length; k++) {
+  for (int k = 0; k < nano_sec && k < V.X.length && k < V.Y.length; k++) {
     int i = V.Y.x[k], j = V.X.x[k];
-
-    if (i < 0 || i >= M.nrow || j < 0 || j >= M.ncol) {
-      printf("Attempting to fill value outside of Matrix!\n");
-      continue;
-    }
-
     M.x[i][j] = '#';
   }
-
-  Vector Ui = initVector(M.nrow * M.ncol);
-  Vector Uj = initVector(M.nrow * M.ncol);
+  
+  Matrix N  = copyMatrix(&M);
   Vector Ai = initVector(M.nrow * M.ncol);
   Vector Aj = initVector(M.nrow * M.ncol);
   Vector D  = initVector(M.nrow * M.ncol);
 
-  int target_i = 70, target_j = 70;
   for (int i = 0; i < M.nrow; i++) {
     for (int j = 0; j < M.ncol; j++) {
-      append(&Ui, i);
-      append(&Uj, j);
+      if (M.x[i][j] == '#') continue;
+
       append(&Ai, i);
       append(&Aj, j);
 
@@ -181,18 +152,53 @@ int main(int argc, char **argv) {
     }
   }
 
-  Djikstra(&Ui, &Uj, &Ai, &Aj, &D, &M);
+  Vector E  = copyVector(&D);
+  Vector Bi = copyVector(&Ai);
+  Vector Bj = copyVector(&Aj);
+ 
+  // Task 1
+  Djikstra(&Ai, &Aj, &D, &M);
 
   printf("Answer Task 1\n  Shortest distance = %d\n", 
       D.x[which2D(&Ai, &Aj, target_i, target_j)]);
 
-  freeVector(&Ui);
-  freeVector(&Uj);
+  freeMatrix(&M);
   freeVector(&Ai);
   freeVector(&Aj);
+  freeVector(&D);
 
-  // printMatrix(&M);
-  freeMatrix(&M);
+  // Task 2
+  for (int k = nano_sec; k < V.X.length && k < V.Y.length; k++) {
+    int i = V.Y.x[k], j = V.X.x[k];
+    N.x[i][j] = '#';
+
+    printf("\rchecking byte %d [%2d,%2d]", k + 1, j, i);
+    fflush(stdout);
+    M  = copyMatrix(&N);
+    D  = copyVector(&E);
+    Ai = copyVector(&Bi);
+    Aj = copyVector(&Bj);
+
+    Djikstra(&Ai, &Aj, &D, &M);
+    
+    int d = D.x[which2D(&Ai, &Aj, target_i, target_j)];
+
+    freeMatrix(&M);
+    freeVector(&D);
+    freeVector(&Ai);
+    freeVector(&Aj);
+    
+    if (d == -1) {
+      printf("\rAnswer Task 2\n  Breaking byte [%2d,%2d]\n", j, i);
+      printMatrix(&M);
+      break;
+    }
+  }
+
+  freeVector(&E);
+  freeVector(&Bi);
+  freeVector(&Bj);
+  freeMatrix(&N);
   freeVectorPair(&V);
   
   return 0;
