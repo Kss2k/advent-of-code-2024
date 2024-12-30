@@ -1,158 +1,174 @@
 #include "shared.h"
+#include <stdio.h>
+
+
+#define RESET_GARDEN(G) \
+  do { \
+    G.sides     = 0; \
+    G.area      = 0; \
+    G.perimeter = 0; \
+  } while (0) 
+
+
+int steps_i[4] = {0, 0, -1, 1},
+    steps_j[4] = {-1, 1, 0, 0};
 
 
 typedef struct {
-  char c;
-  Array I;
-  Array J;
-  int perimeter;
   int area;
-  // n-corner blocks
-  int n4;
-  int n3;
-  int n2;
+  int perimeter;
+  int sides;
 } Garden;
 
 
-void printGarden(Garden *G) {
-  printf("Garden %c\n", G->c);
-  printf("Area: %d\n", G->area);
-  printf("Perimeter: %d\n", G->perimeter);
-  printArray(&G->I);
-  printArray(&G->J);
-}
-
-
-void freeGarden(Garden *G) {
-  freeArray(&G->I);
-  freeArray(&G->J);
-}
-
-
-typedef struct {
-  Garden *gardens;
-  int n;
-} Gardens;
-
-
-int ncorners(int i, int j, Map *M) {
-  int next_i[4] = {i, i, i - 1, i + 1};
-  int next_j[4] = {j - 1, j + 1, j, j};
-  int free[4] = {0, 0, 0, 0};
-
-  int n = 0;
-  for (int k = 0; k < 4; k++) {
-    int i1 = next_i[k];
-    int j1 = next_j[k];
-    
-    if (i1 < 0 || i1 >= M->nrow || j1 < 0 || j1 >= M->ncol || M->x[i][j] != M->x[i1][j1]) {
-      n++;
-      free[k] = 1;
+void printMap(Matrix *M) {
+  printf("Map(%ld, %ld):\n", M->nrow, M->ncol);
+  for (int i = 0; i < M->nrow; i++) {
+    for (int j = 0; j < M->ncol; j++) {
+      printf("%c", M->x[i][j]);
     }
+    printf("\n");
   }
-
-  // check if free = {0, 0, 1, 1} or {1, 1, 0, 0}
-  if ((free[0] && free[1] && !free[2] && !free[3]) ||
-      (!free[0] && !free[1] && free[2] && free[3])) n = 0;
-
-  return n;
 }
 
 
-int isValidPos(int i, int j, Map *M, Garden *G) {
-  return i >= 0 && i < M->nrow && j >= 0 && j < M->ncol && 
-    !isin2D(i, j, &G->I, &G->J);
+int inbounds(int i0, int j0, Matrix *M) {
+  return i0 >= 0 && i0 < M->nrow && j0 >= 0 && j0 < M->ncol;
 }
 
 
-void iterGarden(int i, int j, Map *M, Garden *G) {
-  int next_i[4] = {i, i, i - 1, i + 1};
-  int next_j[4] = {j - 1, j + 1, j, j};
+int vsides(int i0, int j0, Matrix *M) {
+  int left = !inbounds(i0, j0 - 1, M) || M->x[i0][j0 - 1] != M->x[i0][j0],
+    right = !inbounds(i0, j0 + 1, M) || M->x[i0][j0 + 1] != M->x[i0][j0];
+  return left + right;
+}
 
-  int corners = ncorners(i, j, M);
 
-  switch (corners) {
-    case 4:
-      G->n4++;
-      break;
-    case 3:
-      G->n3++;
-      break;
-    case 2:
-      G->n2++;
-      break;
+int hsides(int i0, int j0, Matrix *M) {
+  int up = !inbounds(i0 - 1, j0, M) || M->x[i0 - 1][j0] != M->x[i0][j0],
+    down = !inbounds(i0 + 1, j0, M) || M->x[i0 + 1][j0] != M->x[i0][j0];
+  return up + down;
+}
+
+
+int nsides(int i0, int j0, Matrix *M) {
+  return hsides(i0, j0, M) + vsides(i0, j0, M);
+}
+
+
+int nFreeCorners(int i0, int j0, Matrix *M) {
+  int lu = !inbounds(i0 - 1, j0 - 1, M) || M->x[i0 - 1][j0 - 1] != M->x[i0][j0],
+    ld = !inbounds(i0 + 1, j0 - 1, M) || M->x[i0 + 1][j0 - 1] != M->x[i0][j0],
+    ru = !inbounds(i0 - 1, j0 + 1, M) || M->x[i0 - 1][j0 + 1] != M->x[i0][j0],
+    rd = !inbounds(i0 + 1, j0 + 1, M) || M->x[i0 + 1][j0 + 1] != M->x[i0][j0];
+
+  return lu + ld + ru + rd;
+}
+
+
+int isOuterCorner(int i0, int j0, Matrix *M) {
+  return nsides(i0, j0, M) == 2;
+}
+
+
+int isInnerCorner(int i0, int j0, Matrix *M) {
+  return nsides(i0, j0, M) == 0 && nFreeCorners(i0, j0, M) == 1;
+}
+
+
+int iscorner(int i0, int j0, Matrix *M) {
+  return isOuterCorner(i0, j0, M) || isInnerCorner(i0, j0, M);
+}
+
+
+Matrix readfile(char *path) {
+  FILE *file = fopen(path, "r");
+
+  if (file == NULL) {
+    printf("Error: Unable to open file!\n");
+    exit(-1);  
   }
 
-  for (int k = 0; k < 4; k++) {
-    int i1 = next_i[k];
-    int j1 = next_j[k];
-    
-    if (!isValidPos(i1, j1, M, G) || M->x[i][j] != M->x[i1][j1]) {
-      if (!isin2D(i1, j1, &G->I, &G->J)) G->perimeter++;
+  int ncol = 0, nrow = 0;
+
+  char c;
+  while ((c = getc(file)) != EOF) {
+    if (c != '\n' && !nrow) ncol++;
+    else if (c == '\n') nrow++;
+  }
+
+  Matrix M = initMatrix(2 * nrow, 2 * ncol);
+ 
+  fseek(file, 0L, SEEK_SET);
+  
+  int i = 0, j = 0;
+  while ((c = getc(file)) != EOF) {
+    if (c == '\n') {
+      i++, j = 0;
       continue;
     }
-    
-    G->area++;
-    append(&G->I, i1);
-    append(&G->J, j1);
 
-    iterGarden(i1, j1, M, G);
+    int i0 = 2 * i, j0 = 2 * j++, 
+        i1 = i0 + 1, j1 = j0 + 1;
+
+    M.x[i0][j0] = M.x[i0][j1] = M.x[i1][j0] = M.x[i1][j1] = c;
+  }
+
+  fclose(file);
+
+  return M;
+}
+
+
+void iterate(Matrix *M, Matrix *V, Garden *G, int i0, int j0, char c) {
+  if (!inbounds(i0, j0, M) || M->x[i0][j0] != c || V->x[i0][j0] == '.') return;
+  V->x[i0][j0] = '.';
+
+  G->perimeter += nsides(i0, j0, M);
+  G->sides += iscorner(i0, j0, M);
+  G->area++;
+
+  for (int k = 0; k < 4; k++) {
+    int i1 = i0 + steps_i[k], j1 = j0 + steps_j[k];
+    iterate(M, V, G, i1, j1, c);
   }
 }
 
 
-Garden mapGarden(int i, int j, Map *M) {
-  Garden G;
-  G.c = M->x[i][j];
-  G.I = initArray(INITIAL_CAPACITY);
-  G.J = initArray(INITIAL_CAPACITY);
-  G.perimeter = 0;
-  G.area = 1;
-  G.n4 = 0;
-  G.n3 = 0;
-  G.n2 = 0;
-
-  append(&G.I, i);
-  append(&G.J, j);
-  iterGarden(i, j, M, &G);
-
-  return G;
-}
 
 
 int main(int argc, char **argv) {
-  if (argc <= 1) {
-    printf("Missing file arg!\n");
+  if (argc < 2) {
+    printf("Usage: %s <file>\n", argv[0]);
     exit(-1);
   }
 
-  Map *M = readfile(argv[1]);
-  Array I = initArray(INITIAL_CAPACITY);
-  Array J = initArray(INITIAL_CAPACITY);
+  Matrix M = readfile(argv[1]);
+  Matrix V = copyMatrix(&M);
+  printMap(&M);
 
-  printMap(M);
-  long long int sum_t1 = 0, sum_t2 = 0;
-  for (int i = 0; i < M->nrow; i++) {
-    for (int j = 0; j < M->ncol; j++) {
-      if (isin2D(i, j, &I, &J)) continue;
-      
-      Garden G = mapGarden(i, j, M);
-      concat(&I, &G.I);
-      concat(&J, &G.J);
-
-      int sides = 2 * (4 * G.n4 + 2 * G.n3 + G.n2 - 4) + 4;
-      sum_t1 += G.area * G.perimeter;
-      sum_t2 += G.area * sides;
-      
-      printf("A region of %c plants with price %d * %d = %d\n", G.c, G.area, sides, G.area * sides);
-      printf("  sides = n4 = %d, n3 = %d, n2 = %d\n", G.n4, G.n3, G.n2);
-      freeGarden(&G);
-    }
-  }
+  Garden G;
  
-  printf("Answer Task 1\n  Sum = %lld\n", sum_t1);
-  printf("Answer Task 2\n  Sum = %lld\n", sum_t2);
-  freeMap(M);
+  long long int sum_t1 = 0, perim = 0, area = 0, ngardens = 0, sum_t2 = 0, sides = 0;
+  for (int i = 0; i < M.nrow; i++) for (int j = 0; j < M.ncol; j++) {
+    if (V.x[i][j] == '.') continue;
+    RESET_GARDEN(G); 
+    ngardens++;
+    iterate(&M, &V, &G, i, j, M.x[i][j]);
+    printf("A region of %c plants with price %d * %d = %d\n", M.x[i][j],
+         G.area,  G.perimeter, (G.perimeter / 2) * (G.area / 4));
 
+    perim  += G.perimeter / 2;
+    area   += G.area / 4;
+    sides  += G.sides;
+    sum_t1 += (G.perimeter / 2) * (G.area / 4);
+    sum_t2 += (G.area / 4) * G.sides;
+    if (G.sides < 0) printf("%d\n", G.sides);
+  }
+
+  printf("Answer Task 1:\n  Sum = %lld, perim = %lld, area = %lld, ngardens = %lld\n", sum_t1, perim, area, ngardens);
+  printf("Answer Task 2:\n  Sum = %lld, sides = %lld\n", sum_t2, sides);
+  freeMatrix(&M);
+  freeMatrix(&V);
   return 0;
 }
