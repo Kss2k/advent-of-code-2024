@@ -3,117 +3,184 @@
 #include <stdio.h>
 
 
-void printTDVector(TwoDVector *x) {
-  printf("[%.2f %.2f]\n", x->x[0], x->x[1]);
+typedef struct {
+  Vector px;
+  Vector py;
+  Vector vx;
+  Vector vy;
+} DataFrame;
+
+
+DataFrame *DF;
+
+
+DataFrame initDataFrame(const int capacity) {
+  DataFrame df;
+
+  df.px = initVector(capacity);
+  df.py = initVector(capacity);
+  df.vx = initVector(capacity);
+  df.vy = initVector(capacity);
+
+  return df;
 }
 
 
-TwoDVector vector(int a, int b) {
-  TwoDVector x;
-  x.x[0] = a;
-  x.x[1] = b;
+DataFrame copyDataFrame(const *DataFrame df) {
+  DataFrame df;
 
-  return x;
+  df.px = copyVector(&df->px);
+  df.py = copyVector(&df->py);
+  df.vx = copyVector(&df->vx);
+  df.vy = copyVector(&df->vy);
+
+  return df;
 }
 
 
-TwoDVector vectorAddition(TwoDVector *x, TwoDVector *y) {
-  TwoDVector z;
-  z.x[0] = x->x[0] + y->x[0];
-  z.x[1] = x->x[1] + y->x[1];
-
-  return z;
+void freeDataFrame(DataFrame *df) {
+  freeVector(&df->px);
+  freeVector(&df->py);
+  freeVector(&df->vx);
+  freeVector(&df->vy);
 }
 
 
-void parseVector(FILE *file, Guard *guard, char state) {
-  char c;
+void compRow(void *x, void *y) {
+  ()
+}
 
-  int sign = 1, num = 0, pos = 0;
-  while ((c = getc(file)) != EOF && pos < 2) {
-    if (c == '-') sign = -1;
+void sortDataFrame(DataFrame *df) {
+  DF = df;    
+}
+
+
+void parseVector(FILE *file, DataFrame *df, char state) {
+  char c, pos = 'x';
+
+  int sign = 1, num = 0;
+  while ((c = getc(file)) != EOF && pos != 'e') {
+    if (c == '-')
+      sign = -1;
     else if (!isdigit(c)) {
       switch (state) {
-        case 'p': {
-          guard->position.x[pos++] = sign * num;
-          num = 0;
-          break;
+      case 'p': {
+        if (pos == 'x') {
+          append(&df->px, sign * num);
+          pos = 'y';
+        } else {
+          append(&df->py, sign * num);
+          pos = 'e';
         }
-        case 'v': {
-          guard->velocity.x[pos++] = sign * num;
-          num = 0;
-          break;
-        }
+
+        num = 0;
+        break;
       }
-    } else num = 10 * num + c - '0'; 
+      case 'v': {
+        if (pos == 'x') {
+          append(&df->vx, sign * num);
+          pos = 'y';
+        } else {
+          append(&df->vy, sign * num);
+          pos = 'e';
+        }
+
+        num = 0;
+        break;
+      }
+      }
+    } else
+      num = 10 * num + c - '0';
   }
 
   fseek(file, -1, SEEK_CUR);
 }
 
-
-Guard parseGuard(FILE *file) {
-  TwoDVector position, velocity;
-  Guard guard;
-  guard.position = position, guard.velocity = velocity;
+void parseGuard(FILE *file, DataFrame *df) {
 
   char c;
-  while ((c = getc(file) != '=') && c != EOF);
-  if (c == EOF) return guard;
-  parseVector(file, &guard, 'p');
+  while ((c = getc(file) != '=') && c != EOF)
+    ;
+  if (c == EOF)
+    return;
 
-  while ((c = getc(file) != '=') && c != EOF);
-  if (c == EOF) return guard;
+  parseVector(file, df, 'p');
 
-  parseVector(file, &guard, 'v');
+  while ((c = getc(file) != '=') && c != EOF)
+    ;
+  if (c == EOF)
+    return;
 
-  return guard;
+  parseVector(file, df, 'v');
+
+  return;
 }
 
-
-Vector readfile(char *filename) {
+DataFrame readfile(char *filename) {
   FILE *file = fopen(filename, "r");
   if (file == NULL) {
     printf("Error opening file!\n");
     exit(1);
   }
 
-  Vector guards = initVector(INITIAL_CAPACITY);
+  DataFrame df = initDataFrame(INITIAL_CAPACITY);
+
   char c, state = '\0';
   while ((c = getc(file)) != EOF) {
-    if (c != 'p') continue;
-    Guard guard = parseGuard(file);
-    append(&guards, guard);
+    if (c != 'p')
+      continue;
+    parseGuard(file, &df);
   }
 
   fclose(file);
 
-  return guards;
+  return df;
 }
 
 
-
-void printGuard(Guard *guard) {
-  printf("v=%ld,%ld p=%ld,%ld \n", 
-      guard->position.x[0], 
-      guard->position.x[1], 
-      guard->velocity.x[0],
-      guard->velocity.x[1]);
+void printDataFrame(DataFrame *df) {
+  for (int i = 0; i < df->px.length; i++)
+    printf("[,%2d] p.x=%2d, p.y=%2d, v.x=%2d, v.y=%2d\n", i, df->px.x[i],
+           df->py.x[i], df->vx.x[i], df->vy.x[i]);
 }
 
 
+void calibrate(Vector *x, const int n) {
+  for (int i = 0; i < x->length; i++) {
+    x->x[i] = x->x[i] < 0 ? n - (-x->x[i]) % n : x->x[i] % n;
+    x->x[i] = x->x[i] == n ? 0 : x->x[i];
+  }
+}
+
+
+void add2lhs(Vector *x, Vector *y, const int times) {
+  if (x->length != y->length) {
+    printf("Error: x and y are non-conformable!\n");
+    exit(-1);
+  }
+
+  for (int i = 0; i < x->length; i++)
+    x->x[i] += y->x[i] * times;
+}
+
+void calculate(DataFrame *df, const int n, const int nrow, const int ncol) {
+  add2lhs(&df->px, &df->vx, n);
+  add2lhs(&df->py, &df->vy, n);
+
+  calibrate(&df->px, ncol);
+  calibrate(&df->py, nrow);
+}
 
 int main(int argc, char **argv) {
   if (argc <= 1) {
     printf("Expected file arg!\n");
     return -1;
-  } 
-  
-  Vector guards = readfile(argv[1]);
-  printGuard(&guards.x[0]);
- 
-  
-  freeVector(&guards);
+  }
+
+  DataFrame df = readfile(argv[1]);
+  printDataFrame(&df);
+
+  freeDataFrame(&df);
 
   return 0;
 }

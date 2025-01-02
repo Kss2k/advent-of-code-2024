@@ -10,19 +10,8 @@
 #include "limits.h"
 
 
-typedef struct {
-  long int x[2];
-} TwoDVector;
-
-
-typedef struct {
-  TwoDVector position;
-  TwoDVector velocity;
-} Guard;
-
-
 #define INITIAL_CAPACITY 8
-#define ARR_TYPE Guard
+#define ARR_TYPE int
 #define MAT_TYPE int
 
 
